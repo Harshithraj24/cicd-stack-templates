@@ -44,8 +44,8 @@ A modern, responsive static website providing comprehensive DevOps CI/CD stack r
 
 1. **Clone or download the files**:
    ```bash
-   git clone <repository-url>
-   cd devops-stack-references
+   git clone https://github.com/Harshithraj24/cicd-stack-templates.git
+   cd cicd-stack-templates
    ```
 
 2. **Serve locally** (optional):
@@ -266,7 +266,7 @@ jobs:
 ## File Structure
 
 ```
-devops-stack-references/
+cicd-stack-templates/
 ├── index.html          # Main HTML file
 ├── app.js             # JavaScript functionality
 ├── stacks.json        # Stack configurations
