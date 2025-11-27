@@ -1,0 +1,219 @@
+{
+  "stacks": [
+    {
+      "id": "java-maven",
+      "name": "Java (Maven)",
+      "icon": "fab fa-java",
+      "type": "backend",
+      "buildTool": "maven",
+      "description": "Enterprise Java application with Maven build system",
+      "buildCommands": [
+        "mvn clean compile",
+        "mvn package",
+        "mvn install",
+        "mvn clean package -DskipTests",
+        "mvn dependency:resolve"
+      ],
+      "testCommands": [
+        "mvn test",
+        "mvn verify",
+        "mvn test -Dtest=ClassName",
+        "mvn surefire-report:report",
+        "mvn jacoco:report"
+      ],
+      "dockerfile": "FROM openjdk:17-jdk-slim\n\nWORKDIR /app\n\n# Copy Maven wrapper\nCOPY mvnw pom.xml ./\nCOPY .mvn .mvn\n\n# Download dependencies\nRUN ./mvnw dependency:resolve\n\n# Copy source code\nCOPY src ./src\n\n# Build application\nRUN ./mvnw clean package -DskipTests\n\n# Runtime stage\nFROM openjdk:17-jre-slim\nWORKDIR /app\nCOPY --from=0 /app/target/*.jar app.jar\nEXPOSE 8080\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    \n    tools {\n        maven 'Maven-3.8.1'\n        jdk 'OpenJDK-17'\n    }\n    \n    stages {\n        stage('Checkout') {\n            steps {\n                git branch: 'main', url: '${GIT_URL}'\n            }\n        }\n        \n        stage('Build') {\n            steps {\n                sh 'mvn clean compile'\n            }\n        }\n        \n        stage('Test') {\n            steps {\n                sh 'mvn test'\n            }\n            post {\n                always {\n                    publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'\n                    publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')]\n                }\n            }\n        }\n        \n        stage('Package') {\n            steps {\n                sh 'mvn package -DskipTests'\n            }\n        }\n        \n        stage('Docker Build') {\n            steps {\n                script {\n                    docker.build(\"${IMAGE_NAME}:${BUILD_NUMBER}\")\n                }\n            }\n        }\n        \n        stage('Deploy') {\n            when {\n                branch 'main'\n            }\n            steps {\n                script {\n                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {\n                        docker.image(\"${IMAGE_NAME}:${BUILD_NUMBER}\").push()\n                        docker.image(\"${IMAGE_NAME}:${BUILD_NUMBER}\").push('latest')\n                    }\n                }\n            }\n        }\n    }\n    \n    post {\n        always {\n            cleanWs()\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: java-maven-app\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/java-maven-app\n    targetRevision: HEAD\n    path: k8s\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n    - CreateNamespace=true\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: java-maven-app\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: java-maven-app\n  template:\n    metadata:\n      labels:\n        app: java-maven-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/java-maven-app:latest\n        ports:\n        - containerPort: 8080\n        env:\n        - name: SPRING_PROFILES_ACTIVE\n          value: \"production\"\n        resources:\n          requests:\n            memory: \"512Mi\"\n            cpu: \"250m\"\n          limits:\n            memory: \"1Gi\"\n            cpu: \"500m\"",
+      "gotchas": [
+        "Maven wrapper (mvnw) should be executable: chmod +x mvnw",
+        "Set JAVA_HOME environment variable correctly",
+        "Use .dockerignore to exclude target/ directory",
+        "Maven central repository can be slow - consider using a mirror",
+        "Spring Boot fat JARs are large - use layered JARs for better caching",
+        "Memory settings: -Xmx512m for builds, adjust for runtime"
+      ]
+    },
+    {
+      "id": "java-gradle",
+      "name": "Java (Gradle)",
+      "icon": "fab fa-java",
+      "type": "backend",
+      "buildTool": "gradle",
+      "description": "Enterprise Java application with Gradle build system",
+      "buildCommands": [
+        "./gradlew build",
+        "./gradlew assemble",
+        "./gradlew compileJava",
+        "./gradlew build -x test",
+        "./gradlew dependencies"
+      ],
+      "testCommands": [
+        "./gradlew test",
+        "./gradlew check",
+        "./gradlew test --tests ClassName",
+        "./gradlew jacocoTestReport",
+        "./gradlew test --continue"
+      ],
+      "dockerfile": "FROM openjdk:17-jdk-slim\n\nWORKDIR /app\n\n# Copy Gradle wrapper\nCOPY gradlew build.gradle settings.gradle ./\nCOPY gradle gradle\n\n# Download dependencies\nRUN ./gradlew dependencies --no-daemon\n\n# Copy source code\nCOPY src ./src\n\n# Build application\nRUN ./gradlew build --no-daemon -x test\n\n# Runtime stage\nFROM openjdk:17-jre-slim\nWORKDIR /app\nCOPY --from=0 /app/build/libs/*.jar app.jar\nEXPOSE 8080\nCMD [\"java\", \"-jar\", \"app.jar\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    \n    tools {\n        jdk 'OpenJDK-17'\n    }\n    \n    stages {\n        stage('Checkout') {\n            steps {\n                git branch: 'main', url: '${GIT_URL}'\n            }\n        }\n        \n        stage('Build') {\n            steps {\n                sh './gradlew clean assemble'\n            }\n        }\n        \n        stage('Test') {\n            steps {\n                sh './gradlew test jacocoTestReport'\n            }\n            post {\n                always {\n                    publishTestResults testResultsPattern: 'build/test-results/test/*.xml'\n                    publishCoverage adapters: [jacocoAdapter('build/reports/jacoco/test/jacocoTestReport.xml')]\n                }\n            }\n        }\n        \n        stage('Package') {\n            steps {\n                sh './gradlew build -x test'\n            }\n        }\n        \n        stage('Docker Build') {\n            steps {\n                script {\n                    docker.build(\"${IMAGE_NAME}:${BUILD_NUMBER}\")\n                }\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: java-gradle-app\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/java-gradle-app\n    targetRevision: HEAD\n    path: k8s\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true",
+      "gotchas": [
+        "Gradle wrapper (gradlew) should be executable: chmod +x gradlew",
+        "Use --no-daemon flag in Docker to avoid hanging processes",
+        "Gradle cache can be large - use .dockerignore for .gradle/ directory",
+        "Set org.gradle.parallel=true for faster builds",
+        "Use Gradle build cache: --build-cache flag"
+      ]
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "icon": "fab fa-python",
+      "type": "backend",
+      "buildTool": "pip",
+      "description": "Python application with pip package management",
+      "buildCommands": [
+        "pip install -r requirements.txt",
+        "python setup.py build",
+        "pip install -e .",
+        "python -m build",
+        "pip wheel ."
+      ],
+      "testCommands": [
+        "python -m pytest",
+        "python -m pytest --cov=src",
+        "python -m pytest -v",
+        "python -m pytest --junitxml=test-results.xml",
+        "python -m coverage run -m pytest && coverage report"
+      ],
+      "dockerfile": "FROM python:3.11-slim\n\nWORKDIR /app\n\n# Install system dependencies\nRUN apt-get update && apt-get install -y \\\n    gcc \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Copy requirements first for better caching\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# Copy application code\nCOPY . .\n\n# Create non-root user\nRUN groupadd -r appuser && useradd -r -g appuser appuser\nRUN chown -R appuser:appuser /app\nUSER appuser\n\nEXPOSE 8000\n\n# Health check\nHEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \\\n  CMD curl -f http://localhost:8000/health || exit 1\n\nCMD [\"python\", \"-m\", \"gunicorn\", \"--bind\", \"0.0.0.0:8000\", \"app:app\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    \n    environment {\n        PYTHONPATH = '${WORKSPACE}'\n        PYTHON_VERSION = '3.11'\n    }\n    \n    stages {\n        stage('Checkout') {\n            steps {\n                git branch: 'main', url: '${GIT_URL}'\n            }\n        }\n        \n        stage('Setup') {\n            steps {\n                sh '''\n                    python${PYTHON_VERSION} -m venv venv\n                    . venv/bin/activate\n                    pip install --upgrade pip\n                    pip install -r requirements.txt\n                    pip install -r requirements-dev.txt\n                '''\n            }\n        }\n        \n        stage('Lint') {\n            steps {\n                sh '''\n                    . venv/bin/activate\n                    flake8 src/ tests/\n                    black --check src/ tests/\n                    isort --check-only src/ tests/\n                '''\n            }\n        }\n        \n        stage('Test') {\n            steps {\n                sh '''\n                    . venv/bin/activate\n                    pytest --junitxml=test-results.xml --cov=src --cov-report=xml\n                '''\n            }\n            post {\n                always {\n                    publishTestResults testResultsPattern: 'test-results.xml'\n                    publishCoverage adapters: [coberturaAdapter('coverage.xml')]\n                }\n            }\n        }\n        \n        stage('Security Scan') {\n            steps {\n                sh '''\n                    . venv/bin/activate\n                    bandit -r src/ -f json -o bandit-report.json\n                    safety check --json --output safety-report.json\n                '''\n            }\n        }\n        \n        stage('Docker Build') {\n            steps {\n                script {\n                    docker.build(\"${IMAGE_NAME}:${BUILD_NUMBER}\")\n                }\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: python-app\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/python-app\n    targetRevision: HEAD\n    path: k8s\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: python-app\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: python-app\n  template:\n    metadata:\n      labels:\n        app: python-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/python-app:latest\n        ports:\n        - containerPort: 8000\n        env:\n        - name: FLASK_ENV\n          value: \"production\"\n        - name: PYTHONUNBUFFERED\n          value: \"1\"\n        resources:\n          requests:\n            memory: \"256Mi\"\n            cpu: \"100m\"\n          limits:\n            memory: \"512Mi\"\n            cpu: \"500m\"",
+      "gotchas": [
+        "Pin Python version in Dockerfile for reproducibility",
+        "Use requirements-dev.txt for development dependencies",
+        "Set PYTHONUNBUFFERED=1 in Docker for proper logging",
+        "Use .dockerignore to exclude __pycache__ and .pyc files",
+        "Virtual environments don't work well in Docker - install globally",
+        "Consider using poetry or pipenv for better dependency management",
+        "Use multi-stage builds to reduce final image size"
+      ]
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js",
+      "icon": "fab fa-node-js",
+      "type": "backend",
+      "buildTool": "npm",
+      "description": "Node.js application with npm package management",
+      "buildCommands": [
+        "npm install",
+        "npm run build",
+        "npm ci",
+        "npm run compile",
+        "npm prune --production"
+      ],
+      "testCommands": [
+        "npm test",
+        "npm run test:coverage",
+        "npm run test:unit",
+        "npm run test:integration",
+        "npm run lint"
+      ],
+      "dockerfile": "FROM node:18-alpine AS builder\n\nWORKDIR /app\n\n# Copy package files\nCOPY package*.json ./\n\n# Install dependencies\nRUN npm ci --only=production\n\n# Copy source code\nCOPY . .\n\n# Build application\nRUN npm run build\n\n# Production stage\nFROM node:18-alpine\n\nWORKDIR /app\n\n# Create non-root user\nRUN addgroup -g 1001 -S nodejs\nRUN adduser -S nodeapp -u 1001\n\n# Copy built application\nCOPY --from=builder --chown=nodeapp:nodejs /app/node_modules ./node_modules\nCOPY --from=builder --chown=nodeapp:nodejs /app/dist ./dist\nCOPY --from=builder --chown=nodeapp:nodejs /app/package*.json ./\n\nUSER nodeapp\n\nEXPOSE 3000\n\n# Health check\nHEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\n  CMD node healthcheck.js\n\nCMD [\"node\", \"dist/index.js\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    \n    tools {\n        nodejs 'Node-18'\n    }\n    \n    environment {\n        CI = 'true'\n        NODE_ENV = 'test'\n    }\n    \n    stages {\n        stage('Checkout') {\n            steps {\n                git branch: 'main', url: '${GIT_URL}'\n            }\n        }\n        \n        stage('Install Dependencies') {\n            steps {\n                sh 'npm ci'\n            }\n        }\n        \n        stage('Lint') {\n            steps {\n                sh 'npm run lint'\n                sh 'npm run format:check'\n            }\n        }\n        \n        stage('Build') {\n            steps {\n                sh 'npm run build'\n            }\n        }\n        \n        stage('Test') {\n            parallel {\n                stage('Unit Tests') {\n                    steps {\n                        sh 'npm run test:unit -- --reporter=xunit --outputFile=unit-test-results.xml'\n                    }\n                }\n                stage('Integration Tests') {\n                    steps {\n                        sh 'npm run test:integration -- --reporter=xunit --outputFile=integration-test-results.xml'\n                    }\n                }\n            }\n            post {\n                always {\n                    publishTestResults testResultsPattern: '*-test-results.xml'\n                    publishCoverage adapters: [istanbulCoberturaAdapter('coverage/cobertura-coverage.xml')]\n                }\n            }\n        }\n        \n        stage('Security Audit') {\n            steps {\n                sh 'npm audit --audit-level moderate'\n                sh 'npm run security:check'\n            }\n        }\n        \n        stage('Docker Build') {\n            steps {\n                script {\n                    docker.build(\"${IMAGE_NAME}:${BUILD_NUMBER}\")\n                }\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: nodejs-app\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/nodejs-app\n    targetRevision: HEAD\n    path: k8s\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: nodejs-app\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: nodejs-app\n  template:\n    metadata:\n      labels:\n        app: nodejs-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/nodejs-app:latest\n        ports:\n        - containerPort: 3000\n        env:\n        - name: NODE_ENV\n          value: \"production\"\n        - name: PORT\n          value: \"3000\"\n        resources:\n          requests:\n            memory: \"128Mi\"\n            cpu: \"100m\"\n          limits:\n            memory: \"512Mi\"\n            cpu: \"500m\"",
+      "gotchas": [
+        "Use npm ci instead of npm install in CI/CD for faster, deterministic installs",
+        "Pin Node.js version using .nvmrc file",
+        "Use alpine images to reduce size but watch for native dependency issues",
+        "Set NODE_ENV=production for optimal runtime performance",
+        "Use .dockerignore to exclude node_modules and .git",
+        "Consider using npm workspaces for monorepo setups",
+        "Use multi-stage builds to exclude development dependencies"
+      ]
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "icon": "fab fa-rust",
+      "type": "backend",
+      "buildTool": "cargo",
+      "description": "Rust application with Cargo build system",
+      "buildCommands": [
+        "cargo build",
+        "cargo build --release",
+        "cargo check",
+        "cargo build --target x86_64-unknown-linux-musl",
+        "cargo install --path ."
+      ],
+      "testCommands": [
+        "cargo test",
+        "cargo test --release",
+        "cargo test -- --nocapture",
+        "cargo bench",
+        "cargo clippy -- -D warnings"
+      ],
+      "dockerfile": "# Build stage\nFROM rust:1.75 AS builder\n\nWORKDIR /app\n\n# Copy manifests\nCOPY Cargo.toml Cargo.lock ./\n\n# Create a dummy main.rs to build dependencies\nRUN mkdir src && echo 'fn main() {}' > src/main.rs\nRUN cargo build --release\nRUN rm -rf src\n\n# Copy source code\nCOPY src ./src\n\n# Build the actual application\nRUN touch src/main.rs\nRUN cargo build --release\n\n# Runtime stage\nFROM debian:bookworm-slim\n\nWORKDIR /app\n\n# Install runtime dependencies\nRUN apt-get update && apt-get install -y \\\n    ca-certificates \\\n    && rm -rf /var/lib/apt/lists/*\n\n# Create non-root user\nRUN groupadd -r appuser && useradd -r -g appuser appuser\n\n# Copy binary\nCOPY --from=builder /app/target/release/your-app /usr/local/bin/your-app\n\n# Set ownership\nRUN chown appuser:appuser /usr/local/bin/your-app\n\nUSER appuser\n\nEXPOSE 8080\n\nCMD [\"your-app\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    \n    environment {\n        CARGO_HOME = '${WORKSPACE}/.cargo'\n        RUSTUP_HOME = '${WORKSPACE}/.rustup'\n    }\n    \n    stages {\n        stage('Checkout') {\n            steps {\n                git branch: 'main', url: '${GIT_URL}'\n            }\n        }\n        \n        stage('Setup Rust') {\n            steps {\n                sh '''\n                    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y\n                    source ${CARGO_HOME}/env\n                    rustup component add clippy rustfmt\n                '''\n            }\n        }\n        \n        stage('Check') {\n            steps {\n                sh '''\n                    source ${CARGO_HOME}/env\n                    cargo check\n                '''\n            }\n        }\n        \n        stage('Format & Lint') {\n            steps {\n                sh '''\n                    source ${CARGO_HOME}/env\n                    cargo fmt -- --check\n                    cargo clippy -- -D warnings\n                '''\n            }\n        }\n        \n        stage('Test') {\n            steps {\n                sh '''\n                    source ${CARGO_HOME}/env\n                    cargo test --verbose\n                '''\n            }\n        }\n        \n        stage('Build') {\n            steps {\n                sh '''\n                    source ${CARGO_HOME}/env\n                    cargo build --release\n                '''\n            }\n        }\n        \n        stage('Security Audit') {\n            steps {\n                sh '''\n                    source ${CARGO_HOME}/env\n                    cargo install cargo-audit\n                    cargo audit\n                '''\n            }\n        }\n        \n        stage('Docker Build') {\n            steps {\n                script {\n                    docker.build(\"${IMAGE_NAME}:${BUILD_NUMBER}\")\n                }\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: rust-app\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: https://github.com/your-org/rust-app\n    targetRevision: HEAD\n    path: k8s\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: default\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: rust-app\nspec:\n  replicas: 3\n  selector:\n    matchLabels:\n      app: rust-app\n  template:\n    metadata:\n      labels:\n        app: rust-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/rust-app:latest\n        ports:\n        - containerPort: 8080\n        env:\n        - name: RUST_LOG\n          value: \"info\"\n        resources:\n          requests:\n            memory: \"64Mi\"\n            cpu: \"50m\"\n          limits:\n            memory: \"256Mi\"\n            cpu: \"200m\"",
+      "gotchas": [
+        "Use cargo check for fast syntax checking without building",
+        "Rust compile times can be long - use cargo build cache in CI",
+        "Consider using musl target for smaller, static binaries",
+        "Use .dockerignore to exclude target/ directory",
+        "Cargo.lock should be committed for applications, not libraries",
+        "Use cargo clippy for additional linting beyond rustc",
+        "Docker layer caching works well with Rust dependency builds"
+      ]
+    },
+    {
+      "id": "dotnet",
+      "name": ".NET Core",
+      "icon": "fab fa-microsoft",
+      "type": "backend",
+      "buildTool": "dotnet",
+      "description": ".NET Core application",
+      "buildCommands": [
+        "dotnet build",
+        "dotnet publish -c Release",
+        "dotnet restore"
+      ],
+      "testCommands": [
+        "dotnet test",
+        "dotnet test --collect:\"XPlat Code Coverage\""
+      ],
+      "dockerfile": "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build\nWORKDIR /app\nCOPY *.csproj ./\nRUN dotnet restore\nCOPY . ./\nRUN dotnet publish -c Release -o out\n\nFROM mcr.microsoft.com/dotnet/aspnet:8.0\nWORKDIR /app\nCOPY --from=build /app/out .\nEXPOSE 80\nENTRYPOINT [\"dotnet\", \"YourApp.dll\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    stages {\n        stage('Build') {\n            steps {\n                sh 'dotnet build'\n            }\n        }\n        stage('Test') {\n            steps {\n                sh 'dotnet test'\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: dotnet-app\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: dotnet-app\n  template:\n    metadata:\n      labels:\n        app: dotnet-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/dotnet-app:latest\n        ports:\n        - containerPort: 80",
+      "gotchas": [
+        "Use specific .NET version tags",
+        "Restore packages before copying source code for better caching"
+      ]
+    },
+    {
+      "id": "react",
+      "name": "React",
+      "icon": "fab fa-react",
+      "type": "frontend",
+      "buildTool": "npm",
+      "description": "React frontend application",
+      "buildCommands": [
+        "npm run build",
+        "npm install",
+        "npm run build:prod"
+      ],
+      "testCommands": [
+        "npm test",
+        "npm run test:coverage"
+      ],
+      "dockerfile": "FROM node:18-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . ./\nRUN npm run build\n\nFROM nginx:alpine\nCOPY --from=build /app/build /usr/share/nginx/html\nEXPOSE 80\nCMD [\"nginx\", \"-g\", \"daemon off;\"]",
+      "jenkinsfile": "pipeline {\n    agent any\n    stages {\n        stage('Build') {\n            steps {\n                sh 'npm ci && npm run build'\n            }\n        }\n        stage('Test') {\n            steps {\n                sh 'npm test -- --coverage --watchAll=false'\n            }\n        }\n    }\n}",
+      "argocdManifest": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: react-app\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: react-app\n  template:\n    metadata:\n      labels:\n        app: react-app\n    spec:\n      containers:\n      - name: app\n        image: your-registry/react-app:latest\n        ports:\n        - containerPort: 80",
+      "gotchas": [
+        "Set CI=true environment variable for non-interactive builds",
+        "Use nginx for serving static files in production"
+      ]
+    }
+  ]
+}

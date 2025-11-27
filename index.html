@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps CI/CD Stack References</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1f2937',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        .dark .code-block {
+            background: #0d1117;
+        }
+        .copy-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .code-container:hover .copy-button {
+            opacity: 1;
+        }
+        .stack-card {
+            transition: all 0.3s ease;
+        }
+        .stack-card:hover {
+            transform: translateY(-4px);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-code-branch text-primary text-2xl"></i>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">DevOps CI/CD Stack References</h1>
+                </div>
+                <button id="theme-toggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                    <i class="fas fa-sun hidden dark:inline text-yellow-400"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search and Filters -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Search -->
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    <input type="text" id="search-input" placeholder="Search stacks..." 
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white 
+                                  focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                
+                <!-- Language Type Filter -->
+                <select id="type-filter" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                               bg-white dark:bg-gray-700 text-gray-900 dark:text-white 
+                                               focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">All Types</option>
+                    <option value="backend">Backend</option>
+                    <option value="frontend">Frontend</option>
+                    <option value="ml">Machine Learning</option>
+                </select>
+                
+                <!-- Build Tool Filter -->
+                <select id="tool-filter" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                               bg-white dark:bg-gray-700 text-gray-900 dark:text-white 
+                                               focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">All Build Tools</option>
+                    <option value="maven">Maven</option>
+                    <option value="gradle">Gradle</option>
+                    <option value="npm">NPM</option>
+                    <option value="yarn">Yarn</option>
+                    <option value="cargo">Cargo</option>
+                    <option value="pip">Pip</option>
+                    <option value="dotnet">DotNet</option>
+                    <option value="bundle">Bundle</option>
+                    <option value="composer">Composer</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Stack Cards Container -->
+        <div id="stacks-container" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <!-- Stack cards will be dynamically generated here -->
+        </div>
+
+        <!-- No Results Message -->
+        <div id="no-results" class="hidden text-center py-12">
+            <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No stacks found</h3>
+            <p class="text-gray-500 dark:text-gray-400">Try adjusting your search criteria</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="text-center">
+                <p class="text-gray-500 dark:text-gray-400">DevOps CI/CD Stack References - Built for modern development workflows</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
